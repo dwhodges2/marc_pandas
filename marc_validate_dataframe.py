@@ -36,7 +36,7 @@ geolocate_spec = pa.Column(
 
 data_schema = pa.DataFrameSchema(
     {
-        "recid": pa.Column(int),
+        "recid": pa.Column(int, unique=True),
         "269__a": datetime_spec,
         "269__b": datetime_spec,
         "342_0c": geolocate_spec,
