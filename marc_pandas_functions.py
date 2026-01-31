@@ -2,6 +2,7 @@ import os
 from lxml import etree
 import pandas as pd
 import pandera.pandas as pa
+import re
 # from tabulate import tabulate
 
 
@@ -23,14 +24,17 @@ STORE = "data/dataframe.pkl"
 
 
 def main():
+    ## Test code here
+
     # marc_2_df_store(INPUT_FOLDER)
 
     MARC_DATA = pd.read_pickle(STORE)
 
-    # x = index_table(MARC_DATA, "245__a")
-    x = freq_table(MARC_DATA, "982__a")
+    x = index_table(MARC_DATA, "245__a")
+    x.toclipboard()
 
-    print(x)
+    print(MARC_DATA[["recid", "269__a"]])
+    print(df_regex_filtered(MARC_DATA, r"^024.*$"))
 
     quit()
 
@@ -38,7 +42,8 @@ def main():
 ### Functions
 
 
-def marc_2_df_store(input_folder, out_file=STORE):
+def marc_2_df_store(input_folder, store):
+    """Parse MARCXML collection from a folder into dataframe and store it as a pickle"""
     newtree = combine_xml_files(input_folder)
     root = newtree.getroot()
     cols = [("recid", "controlfield[@tag='001']")]
@@ -47,7 +52,7 @@ def marc_2_df_store(input_folder, out_file=STORE):
         root,
         cols,
     )
-    marcdf.to_pickle(STORE)
+    marcdf.to_pickle(store)
 
 
 def namespacer(xpath, nsprefix):
@@ -114,12 +119,13 @@ def exists_xpath(element, xpath_query):
 
 
 def get_cols(xmltree, record_name="record", default_ns=None):
+    """return sorted list of all unique datafield/subfield combos in abbreviated notation"""
     ns_xpath = ""
     if default_ns:
         ns_xpath = "{" + default_ns + "}"
         record_name = ns_xpath + record_name
     cols = set()
-    print(ns_xpath + "datafield")
+    # print(ns_xpath + "datafield")
     for child in xmltree:  # a record
         if child.tag == record_name:
             for field in child:
@@ -128,17 +134,12 @@ def get_cols(xmltree, record_name="record", default_ns=None):
 
                     subfields = field.findall(ns_xpath + "subfield")
                     for s in subfields:
-                        # print(s.tag, s.attrib)
                         cols.add(tag_notation(datafield_attribs, s.attrib))
-                # elif field.name == "controlfield":
-                # print(attribs)
-
     return sorted(list(cols))
 
 
-def make_df(
-    xmltree, cols, store="dataframe.pkl", record_name="record", default_ns=None
-):
+def make_df(xmltree, cols, record_name="record", default_ns=None):
+    """Return a dataframe from xmltree"""
     if default_ns:
         record_name = "{" + default_ns + "}" + record_name
 
@@ -164,6 +165,7 @@ def make_df(
 
 
 def combine_xml_files(folder_path, root_tag="collection"):
+    """Combine all XML files in a folder into one /collection element"""
     combined_root = etree.Element(root_tag)
     combined_tree = etree.ElementTree(combined_root)
 
@@ -183,6 +185,7 @@ def combine_xml_files(folder_path, root_tag="collection"):
 
 
 def freq_table(df, col):
+    """Return ordered table of distinct values with counts."""
     try:
         return df[col].value_counts()
     except KeyError:
@@ -190,6 +193,7 @@ def freq_table(df, col):
 
 
 def index_table(df, col, idcol=0, dropna=True):
+    """Return table of all non-null values for column, with recid"""
     recid_col = df.columns[0]
     try:
         if dropna:
@@ -197,6 +201,14 @@ def index_table(df, col, idcol=0, dropna=True):
         return df[[recid_col, col]]
     except KeyError:
         print(f"** Index table key error: There is no column {col}!")
+
+
+def df_regex_filtered(df, pattern, id_col="recid"):
+    """Return a filtered dataframe including id plus all column names matching regex pattern, e.g. r"^024.*" """
+    cols = list(df.columns)
+    filtered_cols = [col for col in cols if re.fullmatch(pattern, col)]
+    filtered_cols.insert(0, id_col)
+    return df[filtered_cols].copy()
 
 
 def field_report(df, col):
@@ -253,16 +265,13 @@ def validate_dataframe(dataframe, schema, verbose=False):
 
 
 def validation_report(dataframe, data_schema):
-    # cols_to_validate = list(data_schema.columns.keys())
     fails = validate_dataframe(dataframe, data_schema)
     if fails is not None:
-        # newcols = cols_to_validate
-        # newcols.append("column")
-        # return get_failed_rows(dataframe, fails)[newcols]
         return get_failed_rows(dataframe, fails)
 
 
 def get_repeated_fields(dataframe, delim="\|"):
+    """Return table of repeated fields (fields with delimiters) with counts."""
     # Pipe character indicates concatenation of repeated fields within a record
     counts = {}
     for col in dataframe.columns:

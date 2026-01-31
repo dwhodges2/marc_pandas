@@ -13,7 +13,11 @@ Simple tools for analysis and querying of MARCXML using Pandas dataframes and Pa
  - Examples:
    - `freq_table(df, col)`: Get a list of unique values for a column with the number of records for each.
    - `index_table(df, col)`: Get every given column value with recids for each.
-   - `df[['recid', col1, col2 ... ]]`: Output a subset dataframe with arbitrary set of columns. 
+   - `df[['recid', col1, col2 ... ]]`: Filtered dataframe with arbitrary set of columns. 
+   - `df[df['336__a'].str.contains('computer dataset', na=False)]`: Filtered by content of a field.
+   - Filter columns with regex: `df_regex_filtered(df, r"^7.*")` for all 7XX fields.
+- Output any filtered dataframe to CSV: `.to_csv("output_file_path.csv")`
+- Output tab-delimited to clipboard: `.to_clipboard()` 
  
 ##  Dataframe validation
 
